@@ -194,7 +194,7 @@ class CourseraOAuth2(object):
         if not os.path.isfile(self.token_cache_file):
             dir_name = os.path.dirname(self.token_cache_file)
             try:
-                os.makedirs(dir_name, mode=0700)
+                os.makedirs(dir_name, mode=0o700)
             except:
                 logging.debug(
                     'Encountered an exception creating directory for token '
