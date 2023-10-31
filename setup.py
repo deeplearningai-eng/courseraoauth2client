@@ -28,6 +28,7 @@ setup(name='courseraoauth2client',
       packages=['courseraoauth2client', 'courseraoauth2client.commands'],
       install_requires=[
           'requests>=2.7.0',
+          'six',
           'semver>=2.2.0',
       ],
       test_suite='nose.collector',
