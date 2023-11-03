@@ -17,10 +17,11 @@
 '''
 Helpers for working with OAuth2 / etc.
 '''
-
-import BaseHTTPServer
-import ConfigParser
-import cPickle
+import six
+from six.moves import BaseHTTPServer
+from six.moves import configparser as ConfigParser
+from six.moves import cPickle
+from six.moves import input as raw_input
 import logging
 import requests
 import io
@@ -30,7 +31,7 @@ import subprocess
 import sys
 import re
 import time
-import urlparse
+from six.moves.urllib import parse as urlparse
 import uuid
 from sys import platform as _platform
 
@@ -113,10 +114,11 @@ def _make_handler(state_token, done_function):
     class LocalServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         def error_response(self, msg):
-            logging.warn(
-                'Error response: %(msg)s. %(path)s',
-                msg=msg,
-                path=self.path)
+            logging.warning(
+                msg='Error response: %(messagesg)s. %(path)s',
+                messagesg=msg,
+                path=self.path
+            )
             self.send_response(400)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
@@ -194,7 +196,7 @@ class CourseraOAuth2(object):
         if not os.path.isfile(self.token_cache_file):
             dir_name = os.path.dirname(self.token_cache_file)
             try:
-                os.makedirs(dir_name, mode=0700)
+                os.makedirs(dir_name, mode=0o700)
             except:
                 logging.debug(
                     'Encountered an exception creating directory for token '
@@ -280,8 +282,8 @@ class CourseraOAuth2(object):
         '''
         def check_string_value(name):
             return (
-                isinstance(cache_value[name], str) or
-                isinstance(cache_value[name], unicode)
+                isinstance(cache_value[name], six.binary_type) or
+                isinstance(cache_value[name], six.text_type)
             )
 
         def check_refresh_token():
@@ -345,7 +347,7 @@ class CourseraOAuth2(object):
 
         if 'refresh_token' in body:
             refresh = body['refresh_token']
-            if isinstance(refresh, str) or isinstance(refresh, unicode):
+            if isinstance(refresh, six.binary_type) or isinstance(refresh, six.text_type):
                 tokens['refresh'] = refresh
         return tokens
 
@@ -542,7 +544,7 @@ client_secret = pgD4adDd7lm-ksfG7UazUA
 scopes = view_profile manage_research_exports
 '''
     cfg = ConfigParser.SafeConfigParser()
-    cfg.readfp(io.BytesIO(defaults))
+    cfg.read_file(io.StringIO(defaults))
     cfg.read([
         '/etc/coursera/courseraoauth2client.cfg',
         os.path.expanduser('~/.coursera/courseraoauth2client.cfg'),
