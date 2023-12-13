@@ -115,9 +115,10 @@ def _make_handler(state_token, done_function):
 
         def error_response(self, msg):
             logging.warning(
-                msg='Error response: %(messagesg)s. %(path)s',
-                messagesg=msg,
-                path=self.path
+                'Error response: %(messagesg)s. %(path)s'.format(
+                    messagesg=msg,
+                    path=self.path
+                )
             )
             self.send_response(400)
             self.send_header('Content-type', 'text/plain')
@@ -147,10 +148,11 @@ def _make_handler(state_token, done_function):
             self.wfile.write(
                 "courseraoauth2client: we have captured Coursera's response "
                 "code. Feel free to close this browser window now and return "
-                "to your terminal. Thanks!")
+                "to your terminal. Thanks!".encode('utf-8'))
             done_function(params['code'][0])
 
     return LocalServerHandler
+
 
 OAUTH2_URL_BASE = 'https://accounts.coursera.org/oauth2/v1/'
 
@@ -240,8 +242,8 @@ class CourseraOAuth2(object):
                     logging.debug('Loaded from file system: %s', fs_cached)
                     return fs_cached
                 else:
-                    logging.warn('Found unexpected value in cache. %s',
-                                 fs_cached)
+                    logging.warning('Found unexpected value in cache. %s',
+                                    fs_cached)
                     return None
         except IOError:
             logging.debug(
@@ -328,8 +330,9 @@ class CourseraOAuth2(object):
 
         body = response.json()
         if 'access_token' not in body or 'expires_in' not in body:
-            logging.error('Malformed / missing fields in body. %(body)s',
-                          body=body)
+            logging.error('Malformed / missing fields in body. %(body)s'.format(
+                body=body)
+            )
             raise OAuth2Exception(
                 'Malformed response body from token endpoint.')
 
@@ -389,8 +392,9 @@ class CourseraOAuth2(object):
             try:
                 subprocess.check_call(['open', authorization_url])
             except:
-                logging.exception('Could not call `open %(url)s`.',
-                                  url=authorization_url)
+                logging.exception('Could not call `open %(url)s`.'.format(
+                    url=authorization_url)
+                )
 
         if self.local_webserver_port is not None:
             # Boot up a local webserver to retrieve the response.
@@ -492,7 +496,7 @@ def build_oauth2(app, args=None, cfg=None):
         cache_filename = args.token_cache_file
     except:
         dirname = cfg.get('oauth2', 'token_cache_base')
-        sanitized_app = re.sub('[^\w\-_\.]', '_', app)
+        sanitized_app = re.sub(r'[^\w\-_\.]', '_', app)
         filename = '%s_oauth2_cache.pickle' % sanitized_app
         cache_filename = os.path.join(dirname, filename)
 
