@@ -520,7 +520,7 @@ def configure_app(app_name, cfg):
     cfg.set(app_name, 'client_secret', client_secret)
     cfg.set(app_name, 'scopes', "view_profile %s" % (scopes))
     cfg_path = os.path.expanduser('~/.coursera/courseraoauth2client.cfg')
-    with open(cfg_path, 'wb') as configfile:
+    with open(cfg_path, 'w') as configfile:
         cfg.write(configfile)
     logging.info('Application "%s" configured!', app_name)
 
