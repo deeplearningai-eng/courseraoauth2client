@@ -157,121 +157,12 @@ def _make_handler(state_token, done_function):
 OAUTH2_URL_BASE = 'https://accounts.coursera.org/oauth2/v1/'
 
 
-class CourseraOAuth2(object):
-    '''
-    This class manages the OAuth2 tokens used to access Coursera's APIs
+class TokenStorageUpdater(object):
+    def load_token_cache(self) -> dict | None:
+        raise NotImplementedError('Subclasses must implement this method.')
 
-    You must register your app with Coursera at:
-
-        https://accounts.coursera.org/console
-
-    Construct an instance of this class with the client_id and client_secret
-    displayed in the Coursera app console. Please also set a redirect url to be
-
-        http://localhost:9876/callback
-
-    Note: you can replace the port number (9876 above) with whatever port you'd
-    like. If you would not like to use the local webserver to retrieve the
-    codes set the local_webserver_port field in the constructor to None.
-
-    TODO: add usage / more documentation.
-    '''
-
-    def __init__(self,
-                 client_id,
-                 client_secret,
-                 scopes,
-                 token_cache_file,
-                 auth_endpoint=OAUTH2_URL_BASE+'auth',
-                 token_endpoint=OAUTH2_URL_BASE+'token',
-                 verify_tls=True,
-                 local_webserver_port=9876):
-
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.scopes = scopes
-        self.auth_endpoint = auth_endpoint
-        self.token_endpoint = token_endpoint
-        self.verify_tls = verify_tls
-        self.token_cache_file = os.path.expanduser(token_cache_file)
-        # Create the appropriate directory if not already in existance.
-        if not os.path.isfile(self.token_cache_file):
-            dir_name = os.path.dirname(self.token_cache_file)
-            try:
-                os.makedirs(dir_name, mode=0o700)
-            except:
-                logging.debug(
-                    'Encountered an exception creating directory for token '
-                    'cache file. Ignoring...',
-                    exc_info=True)
-        else:
-            # TODO: check file permissions to ensure not world readable.
-            pass
-        # If not None, run a local webserver to hear the callback.
-        self.local_webserver_port = local_webserver_port
-        self._token_cache = None
-
-    @property
-    def _redirect_uri(self):
-        return 'http://%(hostname)s:%(port)s/callback' % {
-            'hostname': 'localhost',
-            'port': self.local_webserver_port,
-        }
-
-    @property
-    def token_cache(self):
-        if self._token_cache is None:
-            # Load token cache from the file system.
-            cache = self._load_token_cache()
-            self._token_cache = cache
-        return self._token_cache
-
-    @token_cache.setter
-    def token_cache(self, value):
-        self._token_cache = value
-        self._save_token_cache(value)
-
-    def _load_token_cache(self):
-        'Reads the local fs cache for pre-authorized access tokens'
-        try:
-            logging.debug('About to read from local file cache file %s',
-                          self.token_cache_file)
-            with open(self.token_cache_file, 'rb') as f:
-                fs_cached = cPickle.load(f)
-                if self._check_token_cache_type(fs_cached):
-                    logging.debug('Loaded from file system: %s', fs_cached)
-                    return fs_cached
-                else:
-                    logging.warning('Found unexpected value in cache. %s',
-                                    fs_cached)
-                    return None
-        except IOError:
-            logging.debug(
-                'Did not find file: %s on the file system.',
-                self.token_cache_file)
-            return None
-        except:
-            logging.info(
-                'Encountered exception loading from the file system.',
-                exc_info=True)
-            return None
-
-    def _save_token_cache(self, new_cache):
-        'Write out to the filesystem a cache of the OAuth2 information.'
-        logging.debug('Looking to write to local authentication cache...')
-        if not self._check_token_cache_type(new_cache):
-            logging.error('Attempt to save a bad value: %s', new_cache)
-            return
-        try:
-            logging.debug('About to write to fs cache file: %s',
-                          self.token_cache_file)
-            with open(self.token_cache_file, 'wb') as f:
-                cPickle.dump(new_cache, f, protocol=cPickle.HIGHEST_PROTOCOL)
-                logging.debug('Finished dumping cache_value to fs cache file.')
-        except:
-            logging.exception(
-                'Could not successfully cache OAuth2 secrets on the file '
-                'system.')
+    def save_token_cache(self, new_cache):
+        raise NotImplementedError('Subclasses must implement this method.')
 
     def _check_token_cache_type(self, cache_value):
         '''
@@ -302,6 +193,130 @@ class CourseraOAuth2(object):
             isinstance(cache_value['expires'], float) and
             check_refresh_token()
         )
+
+
+class LocalTokenStorageUpdater(TokenStorageUpdater):
+    def __init__(self, token_cache_file):
+        self.token_cache_file = os.path.expanduser(token_cache_file)
+
+    def load_token_cache(self) -> dict | None:
+        'Reads the local fs cache for pre-authorized access tokens'
+        try:
+            logging.debug('About to read from local file cache file %s',
+                          self.token_cache_file)
+            with open(self.token_cache_file, 'rb') as f:
+                fs_cached = cPickle.load(f)
+                if self._check_token_cache_type(fs_cached):
+                    logging.debug('Loaded from file system: %s', fs_cached)
+                    return fs_cached
+                else:
+                    logging.warning('Found unexpected value in cache. %s',
+                                    fs_cached)
+                    return None
+        except IOError:
+            logging.debug(
+                'Did not find file: %s on the file system.',
+                self.token_cache_file)
+            return None
+        except:
+            logging.info(
+                'Encountered exception loading from the file system.',
+                exc_info=True)
+            return None
+
+    def save_token_cache(self, new_cache):
+        'Write out to the filesystem a cache of the OAuth2 information.'
+        logging.debug('Looking to write to local authentication cache...')
+        if not self._check_token_cache_type(new_cache):
+            logging.error('Attempt to save a bad value: %s', new_cache)
+            return
+        try:
+            logging.debug('About to write to fs cache file: %s',
+                          self.token_cache_file)
+            with open(self.token_cache_file, 'wb') as f:
+                cPickle.dump(new_cache, f, protocol=cPickle.HIGHEST_PROTOCOL)
+                logging.debug('Finished dumping cache_value to fs cache file.')
+        except:
+            logging.exception(
+                'Could not successfully cache OAuth2 secrets on the file '
+                'system.')
+
+
+class CourseraOAuth2(object):
+    '''
+    This class manages the OAuth2 tokens used to access Coursera's APIs
+
+    You must register your app with Coursera at:
+
+        https://accounts.coursera.org/console
+
+    Construct an instance of this class with the client_id and client_secret
+    displayed in the Coursera app console. Please also set a redirect url to be
+
+        http://localhost:9876/callback
+
+    Note: you can replace the port number (9876 above) with whatever port you'd
+    like. If you would not like to use the local webserver to retrieve the
+    codes set the local_webserver_port field in the constructor to None.
+
+    TODO: add usage / more documentation.
+    '''
+
+    def __init__(self,
+                 client_id,
+                 client_secret,
+                 scopes,
+                 token_cache_file,
+                 token_updater:TokenStorageUpdater = None,
+                 auth_endpoint=OAUTH2_URL_BASE+'auth',
+                 token_endpoint=OAUTH2_URL_BASE+'token',
+                 verify_tls=True,
+                 local_webserver_port=9876):
+
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.scopes = scopes
+        self.auth_endpoint = auth_endpoint
+        self.token_endpoint = token_endpoint
+        self.verify_tls = verify_tls
+        self.token_cache_file = os.path.expanduser(token_cache_file)
+        self.token_updater = token_updater
+        # Create the appropriate directory if not already in existance.
+        if not os.path.isfile(self.token_cache_file):
+            dir_name = os.path.dirname(self.token_cache_file)
+            try:
+                os.makedirs(dir_name, mode=0o700)
+            except:
+                logging.debug(
+                    'Encountered an exception creating directory for token '
+                    'cache file. Ignoring...',
+                    exc_info=True)
+        else:
+            # TODO: check file permissions to ensure not world readable.
+            pass
+        # If not None, run a local webserver to hear the callback.
+        self.local_webserver_port = local_webserver_port
+        self._token_cache = None
+
+    @property
+    def _redirect_uri(self):
+        return 'http://%(hostname)s:%(port)s/callback' % {
+            'hostname': 'localhost',
+            'port': self.local_webserver_port,
+        }
+
+    @property
+    def token_cache(self):
+        if self._token_cache is None:
+            # Load token cache from the file system.
+            cache = self.token_updater.load_token_cache()
+            self._token_cache = cache
+        return self._token_cache
+
+    @token_cache.setter
+    def token_cache(self, value):
+        self._token_cache = value
+        self.token_updater.save_token_cache(value)
 
     def _request_tokens_from_token_endpoint(self, form_data):
         logging.debug(
@@ -464,7 +479,7 @@ class CourseraOAuth2(object):
                                   self.token_cache['expires'])
 
 
-def build_oauth2(app, args=None, cfg=None):
+def build_oauth2(app, args=None, cfg=None, token_updater=None):
     if not app:
         raise OAuth2ConfigurationException(
             "Please enter an app name for OAuth2 access")
@@ -500,11 +515,15 @@ def build_oauth2(app, args=None, cfg=None):
         filename = '%s_oauth2_cache.pickle' % sanitized_app
         cache_filename = os.path.join(dirname, filename)
 
+    if not token_updater:
+        token_updater = LocalTokenStorageUpdater(cache_filename)
+
     return CourseraOAuth2(
         client_id=client_id,
         client_secret=client_secret,
         scopes=scopes,
-        token_cache_file=cache_filename
+        token_cache_file=cache_filename,
+        token_updater=token_updater,
     )
 
 
